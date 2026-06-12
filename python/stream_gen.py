@@ -3,7 +3,7 @@ import asyncio
 import matplotlib.pyplot as plt
 
 
-#This generates a stream of simulated GNSS and Wifi transmissions alongside each other (GNSS at baseband, WiFi slightly higher) to simulate a GNSS format beacon.
+#This generates a stream of simulated GNSS and Wifi transmissions alongside each other (GNSS at lowfreq, WiFi slightly higher) to simulate a GNSS format beacon.
 
 #Generates GNNS waveform at baseband with set bandwidth. Uses QPSK. Transmission speed in bps
 def GNSS_signal(transmission_string, current_time_s, fc = 1000, transmission_speed = 50):
@@ -30,4 +30,38 @@ def GNSS_signal(transmission_string, current_time_s, fc = 1000, transmission_spe
         return -np.cos(omega_t)
     elif (bit_segments[symbol_index] == 0x3):
         return -np.sin(omega_t)
+    
+    return 0
+
+def psuedo_wifi_noise(fc, current_time_s):
+
+    channels = 64
+    symbols_per_s = 250000
+    bandwidth_per_channel = 20e6 / channels
+
+    symbol_num = np.floor(symbols_per_s * current_time_s)
+
+    #generate randam QAM64 iq data for one OFDM symbol
+    levels = [-7, -5, -3, -1, 1, 3, 5, 7]
+    qam64_choices = np.array([complex(i, q) for i in levels for q in levels])
+
+    rng = np.random.default_rng(seed=int(symbol_num))
+    iq_array = rng.choice(qam64_choices, channels)
+
+    #create the current analog signal
+    current_value = 0
+    i = 1
+
+    for iq in iq_array:
+        current_f = bandwidth_per_channel * i
+        i_val = iq.real
+        q_val = iq.imag
+
+        omega = 2 * np.pi * current_f * current_time_s
+
+        current_value += (i_val * np.cos(omega) - q_val * np.sin(omega)) * np.cos(2 * np.pi * fc * current_time_s)
+
+        i += 1
+
+    return current_value
 
