@@ -3,6 +3,7 @@ import asyncio
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 
+from psuedo_gc import psuedo_gc
 
 class stream_generator:
     def __init__(self, gnss_string, gnss_fc, gnss_transmission_speed, wifi_fc, stream_sample_rate, relative_amplitude, noise=0, chunk_duration_s=0.005):
@@ -31,7 +32,10 @@ class stream_generator:
         # Pre-allocate wifi channel indices and frequencies
         self.wifi_i_indices = np.arange(1, self.wifi_channels + 1)
         self.wifi_channel_freqs = self.wifi_bandwidth_per_channel * self.wifi_i_indices
-        
+
+        self.chipping_rate = 1.023e6
+        self.psuedo_gold_code = np.array(psuedo_gc)
+
         #store the desired relative_amplitude
         self.relative_amplitude_db = relative_amplitude
 
@@ -66,11 +70,21 @@ class stream_generator:
         I_vals = self.gnss_I_map[current_bits]
         Q_vals = self.gnss_Q_map[current_bits]
 
+        #mix in our psuedo gold code
+        chips_transmitted = time_array * self.chipping_rate
+        chip_indices = (chips_transmitted.astype(int)) % len(self.psuedo_gold_code)
+
+        current_chips = self.psuedo_gold_code[chip_indices]
+
+        I_vals_chipped = I_vals * current_chips
+        Q_vals_chipped = Q_vals * current_chips
+
         # 3. Calculate the carrier phase array
         omega_t = self.gnss_fc * np.pi * 2 * time_array
 
         # 4. Return I/Q modulation for the whole chunk
-        return I_vals * np.cos(omega_t) - Q_vals * np.sin(omega_t))
+        return I_vals_chipped * np.cos(omega_t) - Q_vals_chipped * np.sin(omega_t)
+
     def psuedo_wifi_noise(self, time_array):
         # 1. Determine which WiFi symbols fall into this time chunk
         symbol_nums = np.floor(self.wifi_symbols_per_s * time_array).astype(int)
@@ -115,8 +129,8 @@ class stream_generator:
             wifi_chunk = self.psuedo_wifi_noise(time_array)
             noise = np.random.normal(0, np.sqrt(self.desired_noise_power), samples_per_chunk)
 
-            signal_out = self.gnss_scale * gnss_chunk + self.wifi_scale * wifi_chunk + noise
-            #signal_out = gnss_chunk
+            #signal_out = self.gnss_scale * gnss_chunk + self.wifi_scale * wifi_chunk + noise
+            signal_out = gnss_chunk
             current_time += chunk_duration_s
 
             yield signal_out
@@ -129,7 +143,7 @@ if __name__ == "__main__":
         gnss_fc=1000,                   # GNSS at 1 MHz
         gnss_transmission_speed=500,
         wifi_fc=1e6,                   # WiFi at 5 MHz
-        stream_sample_rate=70e6,       # 20 MHz sample rate
+        stream_sample_rate=10e6,       # 20 MHz sample rate
         chunk_duration_s=0.005,         # 5ms chunks
         noise=-1000,
         relative_amplitude=-100
