@@ -53,6 +53,9 @@ class stream_generator:
         desired_wifi_power = 10 ** (self.relative_amplitude_db / 10)
         self.wifi_scale = np.sqrt(desired_wifi_power / wifi_base_power)
 
+        #noise generated relative to gnss_scale
+        self.desired_noise_power = 10 ** (noise / 10)
+
     def GNSS_signal(self, time_array):
         # 1. Calculate symbol index for the entire time array at once
         symbols_transmitted = time_array * self.gnss_symbol_rate
@@ -67,8 +70,7 @@ class stream_generator:
         omega_t = self.gnss_fc * np.pi * 2 * time_array
 
         # 4. Return I/Q modulation for the whole chunk
-        return I_vals * np.cos(omega_t) - Q_vals * np.sin(omega_t)
-
+        return I_vals * np.cos(omega_t) - Q_vals * np.sin(omega_t))
     def psuedo_wifi_noise(self, time_array):
         # 1. Determine which WiFi symbols fall into this time chunk
         symbol_nums = np.floor(self.wifi_symbols_per_s * time_array).astype(int)
@@ -111,8 +113,9 @@ class stream_generator:
             # Bulk generate signals
             gnss_chunk = self.GNSS_signal(time_array)
             wifi_chunk = self.psuedo_wifi_noise(time_array)
+            noise = np.random.normal(0, np.sqrt(self.desired_noise_power), samples_per_chunk)
 
-            signal_out = self.gnss_scale * gnss_chunk + self.wifi_scale * wifi_chunk
+            signal_out = self.gnss_scale * gnss_chunk + self.wifi_scale * wifi_chunk + noise
             #signal_out = gnss_chunk
             current_time += chunk_duration_s
 
@@ -126,8 +129,9 @@ if __name__ == "__main__":
         gnss_fc=1000,                   # GNSS at 1 MHz
         gnss_transmission_speed=500,
         wifi_fc=1e6,                   # WiFi at 5 MHz
-        stream_sample_rate=50e6,       # 20 MHz sample rate
+        stream_sample_rate=70e6,       # 20 MHz sample rate
         chunk_duration_s=0.005,         # 5ms chunks
+        noise=-1000,
         relative_amplitude=-100
     )
 
