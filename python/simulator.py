@@ -17,11 +17,11 @@ gen = stream_generator(
     wifi_fc=3e6,                   # WiFi about 1Mhz above gnss
     stream_sample_rate=sample_rate,       # 10 MHz sample rate
     chunk_duration_s=0.0004096,
-    noise=-30,
-    relative_amplitude=50
+    noise=10,
+    relative_amplitude=-100
 )
 
-fc = fft_correlator(gnss_fc, sample_rate, 500, psuedo_gc)
+fc = fft_correlator(gnss_fc, sample_rate, 1000, psuedo_gc)
 
 data_yielder = gen.signal_stream()
 
@@ -33,5 +33,6 @@ while True:
     corr_result = fc.load_and_sweep(data, gnss_fc)
     if corr_result is not None:
         data_list.extend(corr_result)
+        fc.get_results()
         break
 plot_3d_correlator_map(data_list)

@@ -8,7 +8,7 @@ from collections import deque
 from psuedo_gc import psuedo_gc
 
 class fft_correlator:
-    def __init__(self, target_carry_freq, samp_rate, scan_range, gold_code, scan_speed_ms = 10, scan_step = 100):
+    def __init__(self, target_carry_freq, samp_rate, scan_range, gold_code, scan_step = 100):
         self.target_carry_freq = target_carry_freq
         self.scan_range = scan_range
         self.psuedo_gc = np.array(gold_code)
@@ -53,7 +53,6 @@ class fft_correlator:
 
         if (len(data_collected) > 0):
             self.correlator_results = data_collected
-            print(data_collected)
             return data_collected
         
         return None
@@ -86,4 +85,21 @@ class fft_correlator:
         return fft.ifft(freq_prod)
 
     def get_results(self):
-       pass 
+        processed_bins = []
+        
+        for bin in self.correlator_results:
+            cut_to_one_phase = bin[1][:self.samples_per_code]
+            magnitudes = np.abs(cut_to_one_phase)
+
+            processed_bins.append((bin[0], magnitudes))
+
+        current_max = 0
+        current_max_tup = None
+
+        for bin in processed_bins:
+            max_index = np.argmax(bin[1])
+            if bin[1][max_index] > current_max:
+                current_max = bin[1][max_index]
+                current_max_tup = (bin[0], max_index)
+
+        print(current_max_tup)
