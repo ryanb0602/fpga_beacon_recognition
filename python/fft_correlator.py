@@ -14,7 +14,6 @@ class fft_correlator:
         self.psuedo_gc = np.array(gold_code)
 
         self.sample_rate = samp_rate
-        self.samples_processed = 0
 
         self.chipping_rate = 1.023e6
 
@@ -32,8 +31,12 @@ class fft_correlator:
 
         self.scan_freqs = np.arange(-scan_range, scan_range, scan_step)
 
-        self.data_buffer = [deque(maxlen = self.buffer_size)]
-        self.data_buffer = self.data_buffer * len(self.scan_freqs)
+        self.data_buffer = [deque(maxlen=self.buffer_size) for _ in range(len(self.scan_freqs))]
+
+        self.samples_processed = []
+        for i in range(len(self.scan_freqs)):
+            self.samples_processed.append(0)
+
         self.current_status = "START"
 
     def load_and_sweep(self, stream, center_freq):
@@ -41,27 +44,31 @@ class fft_correlator:
         data_collected = []
 
         for i in range(len(self.scan_freqs)):
+
             self.load_stream(stream, center_freq + self.scan_freqs[i], i)
             corr_output = self.correlate(i)
             
             if corr_output is not None:
                 data_collected.append((self.scan_freqs[i], corr_output))
 
-        return data_collected
+        if (len(data_collected) > 0):
+            return data_collected
+        
+        return None
 
     def load_stream(self, stream, center_freq, buffer_index):
         raw_voltage = np.array(stream)
 
         time_array = np.arange(0, len(raw_voltage)) / self.sample_rate
-        if (self.samples_processed > 0):
-            time_array += self.samples_processed / self.sample_rate
+        if (self.samples_processed[buffer_index] > 0):
+            time_array += self.samples_processed[buffer_index] / self.sample_rate
         omega_t = center_freq * np.pi * 2 * time_array
 
         I_vals = raw_voltage * np.cos(omega_t)
         Q_vals = raw_voltage * np.sin(omega_t)
 
         self.data_buffer[buffer_index].extend(I_vals - 1j * Q_vals)
-        self.samples_processed += len(raw_voltage)
+        self.samples_processed[buffer_index] += len(raw_voltage)
 
     def correlate(self, buffer_index):
         iq_arr = np.array(self.data_buffer[buffer_index])

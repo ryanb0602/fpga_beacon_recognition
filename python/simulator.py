@@ -28,10 +28,10 @@ data_yielder = gen.signal_stream()
 corr_result = None
 data_list = []
 
-#while True:
-for i in range(10):
+while True:
     data = next(data_yielder)
     corr_result = fc.load_and_sweep(data, gnss_fc)
     if corr_result is not None:
         data_list.extend(corr_result)
+        break
 plot_3d_correlator_map(data_list)

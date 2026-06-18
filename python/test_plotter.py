@@ -27,7 +27,7 @@ def plot_3d_correlator_map(outputs):
     Y = np.arange(Z.shape[1])
 
     # 3. Plot using Plotly
-    fig = go.Figure(data=[go.Surface(z=Z, x=X, y=Y, colorscale='Viridis')])
+    fig = go.Figure(data=[go.Surface(z=Z.T, x=X, y=Y, colorscale='Viridis')])
 
     fig.update_layout(
         title='3D Frequency-Delay Map',
