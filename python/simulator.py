@@ -17,8 +17,8 @@ gen = stream_generator(
     wifi_fc=3e6,                   # WiFi about 1Mhz above gnss
     stream_sample_rate=sample_rate,       # 10 MHz sample rate
     chunk_duration_s=0.0004096,
-    noise=40,
-    relative_amplitude=-100
+    noise=-30,
+    relative_amplitude=50
 )
 
 fc = fft_correlator(gnss_fc, sample_rate, 500, psuedo_gc)

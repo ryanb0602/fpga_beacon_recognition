@@ -37,7 +37,7 @@ class fft_correlator:
         for i in range(len(self.scan_freqs)):
             self.samples_processed.append(0)
 
-        self.current_status = "START"
+        self.correlator_results = []
 
     def load_and_sweep(self, stream, center_freq):
 
@@ -52,6 +52,8 @@ class fft_correlator:
                 data_collected.append((self.scan_freqs[i], corr_output))
 
         if (len(data_collected) > 0):
+            self.correlator_results = data_collected
+            print(data_collected)
             return data_collected
         
         return None
@@ -83,5 +85,5 @@ class fft_correlator:
         #return freq_prod
         return fft.ifft(freq_prod)
 
-    def get_status(self):
-        return current_status
+    def get_results(self):
+       pass 
