@@ -7,6 +7,9 @@ from psuedo_gc import psuedo_gc
 
 class stream_generator:
     def __init__(self, gnss_string, gnss_fc, gnss_transmission_speed, wifi_fc, stream_sample_rate, relative_amplitude, noise=0, chunk_duration_s=0.005):
+        
+        self.chunk_duration_s = chunk_duration_s
+
         # Generate the wifi qam64 table
         self.qam64_levels = [-7, -5, -3, -1, 1, 3, 5, 7]
         self.qam64_choices = np.array([complex(i, q) for i in self.qam64_levels for q in self.qam64_levels])
@@ -58,7 +61,7 @@ class stream_generator:
         self.wifi_scale = np.sqrt(desired_wifi_power / wifi_base_power)
 
         #noise generated relative to gnss_scale
-        self.desired_noise_power = 10 ** (noise / 10)
+        self.desired_noise_power = 10 ** (-noise / 10)
 
     def GNSS_signal(self, time_array):
         # 1. Calculate symbol index for the entire time array at once
@@ -116,8 +119,8 @@ class stream_generator:
         
         return baseband_signal * carrier
 
-    def signal_stream(self, chunk_duration_s=0.005):
-        samples_per_chunk = int(self.sample_rate * chunk_duration_s)
+    def signal_stream(self):
+        samples_per_chunk = int(self.sample_rate * self.chunk_duration_s)
         current_time = 0.0 
 
         while True:
@@ -129,9 +132,9 @@ class stream_generator:
             wifi_chunk = self.psuedo_wifi_noise(time_array)
             noise = np.random.normal(0, np.sqrt(self.desired_noise_power), samples_per_chunk)
 
-            #signal_out = self.gnss_scale * gnss_chunk + self.wifi_scale * wifi_chunk + noise
-            signal_out = gnss_chunk
-            current_time += chunk_duration_s
+            signal_out = self.gnss_scale * gnss_chunk + self.wifi_scale * wifi_chunk + noise
+            #signal_out = gnss_chunk
+            current_time += self.chunk_duration_s
 
             yield signal_out
 
@@ -140,12 +143,12 @@ if __name__ == "__main__":
     # 1. Initialize the generator with sample parameters
     gen = stream_generator(
         gnss_string="TEST_STRING",
-        gnss_fc=1000,                   # GNSS at 1 MHz
-        gnss_transmission_speed=500,
-        wifi_fc=1e6,                   # WiFi at 5 MHz
+        gnss_fc=2.046e6,                   # GNSS at 2x chip rate
+        gnss_transmission_speed=50,
+        wifi_fc=3e6,                   # WiFi at 5 MHz
         stream_sample_rate=10e6,       # 20 MHz sample rate
         chunk_duration_s=0.005,         # 5ms chunks
-        noise=-1000,
+        noise=40,
         relative_amplitude=-100
     )
 
@@ -189,7 +192,7 @@ if __name__ == "__main__":
     plt.ylabel("Frequency [Hz]")
     plt.xlabel("Time [s]")
     
-    plt.ylim(0, 30000000)
+    plt.ylim(0, 2.046e6)
 
     # Add a colorbar to indicate power intensity
     cbar = plt.colorbar()
