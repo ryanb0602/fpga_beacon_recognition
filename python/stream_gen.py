@@ -10,7 +10,7 @@ class stream_generator:
         
         self.chunk_duration_s = chunk_duration_s
 
-        self.phase_offset_samples = phase_offset_samples - 480
+        self.phase_offset_samples = phase_offset_samples
 
         # Generate the wifi qam64 table
         self.qam64_levels = [-7, -5, -3, -1, 1, 3, 5, 7]

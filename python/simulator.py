@@ -12,14 +12,14 @@ sample_rate = 10e6
 
 gen = stream_generator(
     gnss_string="TEST_STRING",
-    gnss_fc=gnss_fc + 500,                   # GNSS at 2x chip rate
+    gnss_fc=gnss_fc,                   # GNSS at 2x chip rate
     gnss_transmission_speed=50,
     wifi_fc=3e6,                   # WiFi about 1Mhz above gnss
     stream_sample_rate=sample_rate,       # 10 MHz sample rate
-    chunk_duration_s=0.0004096,
-    noise=-30,
+    chunk_duration_s=10000 / sample_rate,
+    noise=30,
     relative_amplitude=-100,
-    phase_offset_samples=200 
+    phase_offset_samples=0 
 )
 
 fc = fft_correlator(gnss_fc, sample_rate, 1000, psuedo_gc)
@@ -31,9 +31,7 @@ data_list = []
 
 while True:
     data = next(data_yielder)
-    corr_result = fc.load_and_sweep(data, gnss_fc)
-    if corr_result is not None:
-        data_list.extend(corr_result)
-        fc.get_results()
-        break
-plot_3d_correlator_map(data_list)
+    cycle_complete = fc.load_and_sweep(data, gnss_fc)
+    if cycle_complete:
+        best_freq, best_phase = fc.get_results()
+        print(f"Peak found at Freq Offset: {best_freq}, Phase: {best_phase}")
