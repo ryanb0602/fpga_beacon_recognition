@@ -6,9 +6,11 @@ import scipy.signal as signal
 from psuedo_gc import psuedo_gc
 
 class stream_generator:
-    def __init__(self, gnss_string, gnss_fc, gnss_transmission_speed, wifi_fc, stream_sample_rate, relative_amplitude, noise=0, chunk_duration_s=0.005):
+    def __init__(self, gnss_string, gnss_fc, gnss_transmission_speed, wifi_fc, stream_sample_rate, relative_amplitude, noise=0, chunk_duration_s=0.005, phase_offset_samples = 0):
         
         self.chunk_duration_s = chunk_duration_s
+
+        self.phase_offset_samples = phase_offset_samples - 480
 
         # Generate the wifi qam64 table
         self.qam64_levels = [-7, -5, -3, -1, 1, 3, 5, 7]
@@ -64,6 +66,11 @@ class stream_generator:
         self.desired_noise_power = 10 ** (-noise / 10)
 
     def GNSS_signal(self, time_array):
+
+        time_offset = self.phase_offset_samples / self.sample_rate
+
+        time_array = time_array + time_offset
+
         # 1. Calculate symbol index for the entire time array at once
         symbols_transmitted = time_array * self.gnss_symbol_rate
         symbol_indices = (symbols_transmitted.astype(int)) % len(self.gnss_bit_segments)

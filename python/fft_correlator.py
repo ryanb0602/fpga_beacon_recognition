@@ -100,6 +100,6 @@ class fft_correlator:
             max_index = np.argmax(bin[1])
             if bin[1][max_index] > current_max:
                 current_max = bin[1][max_index]
-                current_max_tup = (bin[0], max_index)
+                current_max_tup = (bin[0], self.samples_per_code - max_index)
 
-        print(current_max_tup)
+        return current_max_tup
