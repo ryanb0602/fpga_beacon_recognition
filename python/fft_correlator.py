@@ -95,7 +95,7 @@ class fft_correlator:
             
             if bin_power[max_index] > current_max:
                 current_max = bin_power[max_index]
-                current_max_tup = (self.scan_freqs[i], max_index)
+                current_max_tup = (self.scan_freqs[i], 10000 - max_index)
 
         self.accumulators = [np.zeros(self.samples_per_code) for _ in range(len(self.scan_freqs))]
         self.blocks_in_acc = 0

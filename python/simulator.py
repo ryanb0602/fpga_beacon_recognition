@@ -12,14 +12,14 @@ sample_rate = 10e6
 
 gen = stream_generator(
     gnss_string="TEST_STRING",
-    gnss_fc=gnss_fc,                   # GNSS at 2x chip rate
+    gnss_fc=gnss_fc + 500,                   # GNSS at 2x chip rate
     gnss_transmission_speed=50,
     wifi_fc=3e6,                   # WiFi about 1Mhz above gnss
     stream_sample_rate=sample_rate,       # 10 MHz sample rate
     chunk_duration_s=10000 / sample_rate,
     noise=30,
     relative_amplitude=-100,
-    phase_offset_samples=0 
+    phase_offset_samples=5 
 )
 
 fc = fft_correlator(gnss_fc, sample_rate, 1000, psuedo_gc)
