@@ -1,0 +1,2 @@
+epoch,detector_accuracy,detector_loss,loss,phase_accuracy,phase_loss,val_detector_accuracy,val_detector_loss,val_loss,val_phase_accuracy,val_phase_loss
+0,0.5128124952316284,1.037868857383728,1.8468252420425415,0.09937500208616257,0.8089563250541687,NA,NA,NA,NA,NA

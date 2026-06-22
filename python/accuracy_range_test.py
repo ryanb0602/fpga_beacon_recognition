@@ -19,7 +19,7 @@ wifi_values = list(range(-100, 51, 10))
 phase_shift_range = [0, 9999]
 doppler_shift_range = [-1000, 1000]
 
-tests_per_value = 100
+tests_per_value = 10
 
 csv_header = ["snr", "wifi_db", "exp_phase_shift", "exp_doppler_shift", "found_phase_shift", "found_doppler_shift"]
 

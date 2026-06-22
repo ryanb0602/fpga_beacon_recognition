@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import string
 import random
+from scipy.signal import decimate
 
 gnss_fc = 2.046e6
 sample_rate = 10e6
@@ -27,7 +28,7 @@ def data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp):
         gnss_transmission_speed=50,
         wifi_fc=3e6,                   # WiFi about 1Mhz above gnss
         stream_sample_rate=sample_rate,       # 10 MHz sample rate
-        chunk_duration_s=4092 / sample_rate,
+        chunk_duration_s=8184 / sample_rate,
         noise=snr,
         relative_amplitude=wifi_amp,
         phase_offset_samples=phase_offset 
@@ -36,74 +37,91 @@ def data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp):
     data_yielder = gen.signal_stream()
     return next(data_yielder)
 
-def train_gen(batch_size=32):
+def train_gen():
     # precalculate values for digitial downsampling
-    t = np.arange(4092) / sample_rate
+    t = np.arange(8184) / sample_rate
     lo_i = np.cos(2 * np.pi * gnss_fc * t)
     lo_q = -np.sin(2 * np.pi * gnss_fc * t)
 
     while True:
-        batch_x = np.zeros((batch_size, 4092, 2), dtype=np.float32)
-        batch_detector = np.zeros((batch_size, 1), dtype=np.float32)
-        batch_phase = np.zeros((batch_size, 11), dtype=np.float32)
-        
-        #generate for num of batches
-        for i in range(batch_size):
-            #random input string so the bnn doesn't learn on string
-            characters = string.ascii_letters + string.digits
-            rand_string = ''.join(random.choices(characters, k=15))
+        # random input string so the bnn doesn't learn on string
+        characters = string.ascii_letters + string.digits
+        rand_string = ''.join(random.choices(characters, k=15))
 
-            #half the time, we should have no discernable outcome, other half we should
-            real_or_fake = random.random()            
-            if real_or_fake < 0.5:
-                off_freq_or_noise = random.random()
-               
-                #half the time, have a frequency shifted signal, the other half pure noise
-                if off_freq_or_noise < 0.5:
-                    phase_offset = random.randint(0, 2047)
-                    freq_offset = random.randint(100, 1000)
-                    if random.random() > 0.5: freq_offset = -freq_offset
-                    snr = random.randint(-10, 10)
-                    wifi_amp = random.randint(-10, 10)
-                    
-                    raw_sig = data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp)
-                else:
-                    raw_sig = np.random.normal(0, 1, 4092)
-
-                batch_detector[i] = 0.0
-                batch_phase[i] = np.zeros(11)
-            else:
-                #generate real signal
+        # half the time, we should have no discernable outcome, other half we should
+        real_or_fake = random.random()            
+        if real_or_fake < 0.5:
+            off_freq_or_noise = random.random()
+            
+            # half the time, have a frequency shifted signal, the other half pure noise
+            if off_freq_or_noise < 0.5:
                 phase_offset = random.randint(0, 2047)
-                freq_offset = 0
-                snr = random.randint(-20, 10)
-                wifi_amp = random.randint(-20, 10)
+                freq_offset = random.randint(100, 1000)
+                if random.random() > 0.5: freq_offset = -freq_offset
+                snr = random.randint(-10, 10)
+                wifi_amp = random.randint(-10, 10)
                 
                 raw_sig = data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp)
+            else:
+                raw_sig = np.random.normal(0, 1, 8184)
 
-                batch_detector[i] = 1.0
-                batch_phase[i] = int_to_gray_array(phase_offset, bits=11)
+            detector_target = 0.0
+            phase_target = np.zeros(10, dtype=np.float32)
 
-            #mix to IQ and binarize
-            i_channel = raw_sig * lo_i
-            q_channel = raw_sig * lo_q
-
-            i_channel -= np.mean(i_channel)
-            q_channel -= np.mean(q_channel)
-
-            i_bin = np.sign(i_channel)
-            i_bin[i_bin == 0] = 1.0
+        else:
+            # generate real signal
+            phase_offset = random.randint(0, 2047)
+            freq_offset = 0
+            snr = random.randint(-20, 10)
+            wifi_amp = random.randint(-20, 10)
             
-            q_bin = np.sign(q_channel)
-            q_bin[q_bin == 0] = 1.0
+            raw_sig = data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp)
 
-            batch_x[i, :, 0] = i_bin
-            batch_x[i, :, 1] = q_bin
+            detector_target = 1.0
+            decimated_phase_offset = phase_offset // 2
+            phase_target = int_to_gray_array(decimated_phase_offset, bits=10).astype(np.float32)
 
-        yield (batch_x, {
-            "detector": batch_detector,
-            "phase": batch_phase
-        })
+        # mix to IQ
+        i_channel = raw_sig * lo_i
+        q_channel = raw_sig * lo_q
+
+        i_channel = i_channel[::2]
+        q_channel = q_channel[::2]
+
+        i_channel -= np.mean(i_channel)
+        q_channel -= np.mean(q_channel)
+
+        # binarize
+        i_bin = np.sign(i_channel)
+        i_bin[i_bin == 0] = 1.0
+        
+        q_bin = np.sign(q_channel)
+        q_bin[q_bin == 0] = 1.0
+
+        x_out = np.stack((i_bin, q_bin), axis=-1).astype(np.float32)
+
+        yield x_out, {
+            "detector": detector_target,
+            "phase": phase_target
+        }
+
+def create_training_dataset(batch_size=32):
+    dataset = tf.data.Dataset.from_generator(
+        train_gen,
+        output_signature=(
+            tf.TensorSpec(shape=(4092, 2), dtype=tf.float32),
+            {
+                "detector": tf.TensorSpec(shape=(), dtype=tf.float32),
+                "phase": tf.TensorSpec(shape=(10,), dtype=tf.float32)
+            }
+        )
+    )
+    
+    dataset = dataset.batch(batch_size)
+    
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+    
+    return dataset
 
 bnn_kwargs = dict(
     input_quantizer="ste_sign",
@@ -122,6 +140,10 @@ x = lq.layers.QuantConv1D(filters=64, kernel_size=7, padding="same", **bnn_kwarg
 x = tf.keras.layers.BatchNormalization(scale=False)(x)
 x = tf.keras.layers.MaxPooling1D(pool_size=4)(x)
 
+x = lq.layers.QuantConv1D(filters=64, kernel_size=3, padding="same", **bnn_kwargs)(x)
+x = tf.keras.layers.BatchNormalization(scale=False)(x)
+x = tf.keras.layers.MaxPooling1D(pool_size=4)(x)
+
 x = tf.keras.layers.Flatten()(x)
 
 x = lq.layers.QuantDense(units=128, **bnn_kwargs)(x)
@@ -131,7 +153,7 @@ x = tf.keras.layers.BatchNormalization(scale=False)(x)
 detector_out = tf.keras.layers.Dense(units=1, activation="sigmoid", name="detector")(x)
 
 #Grey code signal out neuron
-phase_out = tf.keras.layers.Dense(units=11, activation="sigmoid", name="phase")(x)
+phase_out = tf.keras.layers.Dense(units=10, activation="sigmoid", name="phase")(x)
 
 model = tf.keras.Model(inputs=inputs, outputs=[detector_out, phase_out])
 
@@ -150,10 +172,22 @@ model.compile(
 
 lq.models.summary(model)
 
+checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath="checkpoints/epoch-{epoch:02d}.weights.h5",
+        save_weights_only=True,
+        save_best_only=False,
+        save_freq="epoch" 
+        )
+
+csv_logger = tf.keras.callbacks.CSVLogger('training_log.csv', separator=',', append=False)
+
+train_dataset = create_training_dataset(batch_size=32)
+
 history = model.fit(
-    train_gen(batch_size=32),
+    train_dataset,
     steps_per_epoch=100, 
-    epochs=100
+    epochs=100,
+    callbacks=[checkpoint_callback, csv_logger]
 )
 
 model.save_weights('bnn_saq.weights.h5')
