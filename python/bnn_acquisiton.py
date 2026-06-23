@@ -59,7 +59,7 @@ def train_gen():
                 freq_offset = random.randint(100, 1000)
                 if random.random() > 0.5: freq_offset = -freq_offset
                 snr = random.randint(-10, 10)
-                wifi_amp = random.randint(-10, 10)
+                wifi_amp = random.randint(-10, 100)
                 
                 raw_sig = data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp)
             else:
@@ -72,8 +72,8 @@ def train_gen():
             # generate real signal
             phase_offset = random.randint(0, 2047)
             freq_offset = 0
-            snr = random.randint(-20, 10)
-            wifi_amp = random.randint(-20, 10)
+            snr = random.randint(-30, 50)
+            wifi_amp = random.randint(-100, 10)
             
             raw_sig = data_stream(rand_string, freq_offset, phase_offset, snr, wifi_amp)
 
@@ -103,6 +103,9 @@ def train_gen():
         yield x_out, {
             "detector": detector_target,
             "phase": phase_target
+        }, {
+            "detector": 1.0,
+            "phase": detector_target
         }
 
 def create_training_dataset(batch_size=32):
@@ -113,6 +116,10 @@ def create_training_dataset(batch_size=32):
             {
                 "detector": tf.TensorSpec(shape=(), dtype=tf.float32),
                 "phase": tf.TensorSpec(shape=(10,), dtype=tf.float32)
+            },
+            {
+                "detector": tf.TensorSpec(shape=(), dtype=tf.float32),
+                "phase": tf.TensorSpec(shape=(), dtype=tf.float32)
             }
         )
     )
@@ -132,27 +139,24 @@ bnn_kwargs = dict(
 
 inputs = tf.keras.layers.Input(shape=(4092, 2))
 
-x = lq.layers.QuantConv1D(filters=32, kernel_size=15, padding="same", **bnn_kwargs)(inputs)
+x = lq.layers.QuantConv1D(filters=32, kernel_size=15, strides=4, padding="same", **bnn_kwargs)(inputs)
 x = tf.keras.layers.BatchNormalization(scale=False)(x)
-x = tf.keras.layers.MaxPooling1D(pool_size=4)(x)
 
-x = lq.layers.QuantConv1D(filters=64, kernel_size=7, padding="same", **bnn_kwargs)(x)
+x = lq.layers.QuantConv1D(filters=64, kernel_size=7, strides=4, padding="same", **bnn_kwargs)(x)
 x = tf.keras.layers.BatchNormalization(scale=False)(x)
-x = tf.keras.layers.MaxPooling1D(pool_size=4)(x)
 
-x = lq.layers.QuantConv1D(filters=64, kernel_size=3, padding="same", **bnn_kwargs)(x)
+x = lq.layers.QuantConv1D(filters=64, kernel_size=3, strides=4, padding="same", **bnn_kwargs)(x)
 x = tf.keras.layers.BatchNormalization(scale=False)(x)
-x = tf.keras.layers.MaxPooling1D(pool_size=4)(x)
 
 x = tf.keras.layers.Flatten()(x)
 
 x = lq.layers.QuantDense(units=128, **bnn_kwargs)(x)
 x = tf.keras.layers.BatchNormalization(scale=False)(x)
 
-#Signal presence neuron
+# Signal presence neuron
 detector_out = tf.keras.layers.Dense(units=1, activation="sigmoid", name="detector")(x)
 
-#Grey code signal out neuron
+# Grey code signal out neuron
 phase_out = tf.keras.layers.Dense(units=10, activation="sigmoid", name="phase")(x)
 
 model = tf.keras.Model(inputs=inputs, outputs=[detector_out, phase_out])
@@ -167,7 +171,7 @@ model.compile(
         "detector": 1.0,
         "phase": 1.0
     },
-    metrics=["accuracy"]
+    metrics=[tf.keras.metrics.BinaryAccuracy()]
 )
 
 lq.models.summary(model)

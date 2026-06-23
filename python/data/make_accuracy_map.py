@@ -21,7 +21,7 @@ for row in data_array:
     wifi_db = int(row[1])
     exp_phase_shift = int(row[2])
     exp_dopp = int(row[3])
-    found_phase = int(row[4])
+    found_phase = float(row[4])
     found_dopp = int(row[5])
 
     if (np.abs(exp_phase_shift - found_phase) < 50 and np.abs(exp_dopp - found_dopp) < 50):

@@ -114,17 +114,12 @@ class stream_generator:
         i_val = iq_per_sample.real
         q_val = iq_per_sample.imag
 
-        # 5. Broadcast frequencies against time to create an omega matrix
-        # time_array shape: (N, 1), wifi_channel_freqs shape: (1, 64) -> omega shape: (N, 64)
-        omega = 2 * np.pi * self.wifi_channel_freqs[np.newaxis, :] * time_array[:, np.newaxis]
+        absolute_freqs = self.wifi_fc + self.wifi_channel_freqs
+        omega = 2 * np.pi * absolute_freqs[np.newaxis, :] * time_array[:, np.newaxis]
 
-        # 6. Perform the I/Q calculation and sum across the 64 channels simultaneously
-        baseband_signal = np.sum(i_val * np.cos(omega) - q_val * np.sin(omega), axis=1)
+        rf_signal = np.sum(i_val * np.cos(omega) - q_val * np.sin(omega), axis=1)
 
-        # 7. Modulate with the final carrier frequency
-        carrier = np.cos(2 * np.pi * self.wifi_fc * time_array)
-        
-        return baseband_signal * carrier
+        return rf_signal
 
     def signal_stream(self):
         samples_per_chunk = int(self.sample_rate * self.chunk_duration_s)

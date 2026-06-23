@@ -8,7 +8,7 @@ from collections import deque
 from psuedo_gc import psuedo_gc
 
 class fft_correlator:
-    def __init__(self, target_carry_freq, samp_rate, scan_range, gold_code, scan_step = 100):
+    def __init__(self, target_carry_freq, samp_rate, scan_range, gold_code, scan_step = 50, accumulator_cyc = 5):
         self.target_carry_freq = target_carry_freq
         self.scan_range = scan_range
         self.psuedo_gc = np.array(gold_code)
@@ -37,31 +37,27 @@ class fft_correlator:
         for i in range(len(self.scan_freqs)):
             self.samples_processed.append(0)
 
-        cutoff_freq = 1.5e6 
-        numtaps = 65
-        self.fir_taps = signal.firwin(numtaps, cutoff_freq, fs=self.sample_rate)
-        self.zi_I = signal.lfilter_zi(self.fir_taps, 1.0) * 0
-        self.zi_Q = signal.lfilter_zi(self.fir_taps, 1.0) * 0
-
-        self.correlator_results = []
+        self.accumulators = [np.zeros(self.samples_per_code) for _ in range(len(self.scan_freqs))]
+        self.blocks_in_acc = 0
+        self.accumulator_cyc = accumulator_cyc
 
     def load_and_sweep(self, stream, center_freq):
             
-        data_collected = []
-
         for i in range(len(self.scan_freqs)):
-
             self.load_stream(stream, center_freq + self.scan_freqs[i], i)
             corr_output = self.correlate(i)
             
             if corr_output is not None:
-                data_collected.append((self.scan_freqs[i], corr_output))
-
-        if (len(data_collected) > 0):
-            self.correlator_results = data_collected
-            return data_collected
+                cut_to_one = corr_output[:self.samples_per_code]
+                power = np.abs(cut_to_one)**2
+                self.accumulators[i] += power
         
-        return None
+        if corr_output is not None:
+            self.blocks_in_acc += 1
+
+        if self.blocks_in_acc >= self.accumulator_cyc:
+            return True            
+        return False
 
     def load_stream(self, stream, center_freq, buffer_index):
         raw_voltage = np.array(stream)
@@ -74,10 +70,7 @@ class fft_correlator:
         I_vals = raw_voltage * np.cos(omega_t)
         Q_vals = raw_voltage * np.sin(omega_t)
 
-        I_filtered, self.zi_I = signal.lfilter(self.fir_taps, 1.0, I_vals, zi=self.zi_I)
-        Q_filtered, self.zi_Q = signal.lfilter(self.fir_taps, 1.0, Q_vals, zi=self.zi_Q)
-
-        self.data_buffer[buffer_index].extend(I_filtered - 1j * Q_filtered)
+        self.data_buffer[buffer_index].extend(I_vals - 1j * Q_vals)
         self.samples_processed[buffer_index] += len(raw_voltage)
 
     def correlate(self, buffer_index):
@@ -93,21 +86,18 @@ class fft_correlator:
         return fft.ifft(freq_prod)
 
     def get_results(self):
-        processed_bins = []
-        
-        for bin in self.correlator_results:
-            cut_to_one_phase = bin[1][:self.samples_per_code]
-            magnitudes = np.abs(cut_to_one_phase)
-
-            processed_bins.append((bin[0], magnitudes))
-
         current_max = 0
         current_max_tup = None
 
-        for bin in processed_bins:
-            max_index = np.argmax(bin[1])
-            if bin[1][max_index] > current_max:
-                current_max = bin[1][max_index]
-                current_max_tup = (bin[0], (self.samples_per_code - max_index + ((len(self.fir_taps) - 1) / 2)) % self.samples_per_code)
+        for i in range(len(self.scan_freqs)):
+            bin_power = self.accumulators[i]
+            max_index = np.argmax(bin_power)
+            
+            if bin_power[max_index] > current_max:
+                current_max = bin_power[max_index]
+                current_max_tup = (self.scan_freqs[i], (self.samples_per_code - max_index) % self.samples_per_code)
+
+        self.accumulators = [np.zeros(self.samples_per_code) for _ in range(len(self.scan_freqs))]
+        self.blocks_in_acc = 0
 
         return current_max_tup

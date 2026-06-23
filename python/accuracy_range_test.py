@@ -13,13 +13,13 @@ from test_plotter import plot_3d_correlator_map
 gnss_fc = 2.046e6
 sample_rate = 10e6
 
-snr_values = list(range(-50, 51, 10))
-wifi_values = list(range(-100, 51, 10))
+snr_values = list(range(-50, 51, 5))
+wifi_values = list(range(-100, 51, 5))
 
 phase_shift_range = [0, 9999]
 doppler_shift_range = [-1000, 1000]
 
-tests_per_value = 10
+tests_per_value = 20
 
 csv_header = ["snr", "wifi_db", "exp_phase_shift", "exp_doppler_shift", "found_phase_shift", "found_doppler_shift"]
 
@@ -44,13 +44,13 @@ with open(filename, mode='w', newline='') as csv_file:
                     gnss_transmission_speed=50,
                     wifi_fc=3e6,                   # WiFi about 1Mhz above gnss
                     stream_sample_rate=sample_rate,       # 10 MHz sample rate
-                    chunk_duration_s=0.0004096,
+                    chunk_duration_s=10000 / sample_rate,
                     noise=snr,
                     relative_amplitude=wifi_db,
                     phase_offset_samples=phase_shift 
                 )
 
-                fc = fft_correlator(gnss_fc, sample_rate, 1000, psuedo_gc)
+                fc = fft_correlator(gnss_fc, sample_rate, 5000, psuedo_gc)
 
                 data_yielder = gen.signal_stream()
 
