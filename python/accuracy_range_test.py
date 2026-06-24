@@ -60,7 +60,7 @@ with open(filename, mode='w', newline='') as csv_file:
                 while True:
                     data = next(data_yielder)
                     cycle_complete = fc.load_and_sweep(data, gnss_fc)
-                    if cycle_complete:
+                    if cycle_complete is not None:
                         best_freq, best_phase = fc.get_results()
                         print(f"Peak found at Freq Offset: {best_freq}, Phase: {best_phase}")
 

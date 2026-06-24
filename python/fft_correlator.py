@@ -56,8 +56,8 @@ class fft_correlator:
             self.blocks_in_acc += 1
 
         if self.blocks_in_acc >= self.accumulator_cyc:
-            return True            
-        return False
+            return self.accumulators
+        return None
 
     def load_stream(self, stream, center_freq, buffer_index):
         raw_voltage = np.array(stream)
