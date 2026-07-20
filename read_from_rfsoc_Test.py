@@ -1,4 +1,6 @@
 import casperfpga
+import numpy as np
+import time
 
 def to_signed(val, bits):
     if val & (1 << (bits - 1)):
@@ -9,27 +11,26 @@ def fbp17(raw18):
     return to_signed(raw18, 18) / (1 << 17)
 
 def unpack(bit_arr):
-    ELEM_BYTES = 16
-    MASK18 = 0x3FFFF
+    cnt = 0
+    valids_arr = []
+    for i in range(len(bit_arr)):
+        if cnt < 9:
+            valids_arr.append(bit_arr[i])
+        cnt += 1
+        if cnt > 15:
+            cnt = 0
 
-    results = []
-    for i in range(0, 64 * ELEM_BYTES, ELEM_BYTES):
-        chunk = bit_arr[i:i + ELEM_BYTES]
-        val128 = int.from_bytes(chunk, "big")
-        top72 = val128 >> 56
-
-        e0 = (top72 >> 54) & MASK18
-        e1 = (top72 >> 36) & MASK18
-        e2 = (top72 >> 18) & MASK18
-        e3 =  top72        & MASK18
-
-        results.append([fbp17(e) for e in (e0, e1, e2, e3)])
+    bits = int.from_bytes(bytes(valids_arr), 'big')
+    nwords = len(valids_arr) * 8 // 18
+    words = [(bits >> (i*18)) & 0x3FFFF for i in reversed(range(nwords))]
+    
+    return words
 
 def read_i_values(fpga):
-    segment_one = fpga.read("shared_bram", 8192, 0)
-    segment_two = fpga.read("shared_bram1", 8192, 0)
-    segment_three = fpga.read("shared_bram2", 8192, 0)
-    segment_four = fpga.read("shared_bram3", 8192, 0)
+    segment_one = fpga.read("shared_bram", 1024, 0)
+    segment_two = fpga.read("shared_bram1", 1024, 0)
+    segment_three = fpga.read("shared_bram2", 1024, 0)
+    segment_four = fpga.read("shared_bram3", 1024, 0)
 
     seg_a_unpacked = unpack(segment_one)
     seg_b_unpacked = unpack(segment_two)
@@ -41,10 +42,10 @@ def read_i_values(fpga):
     return result
 
 def read_q_values(fpga):
-    segment_one = fpga.read("shared_bram", 8192, 0)
-    segment_two = fpga.read("shared_bram1", 8192, 0)
-    segment_three = fpga.read("shared_bram2", 8192, 0)
-    segment_four = fpga.read("shared_bram3", 8192, 0)
+    segment_one = fpga.read("shared_bram", 1024, 0)
+    segment_two = fpga.read("shared_bram1", 1024, 0)
+    segment_three = fpga.read("shared_bram2", 1024, 0)
+    segment_four = fpga.read("shared_bram3", 1024, 0)
 
     seg_a_unpacked = unpack(segment_one)
     seg_b_unpacked = unpack(segment_two)
@@ -54,3 +55,18 @@ def read_q_values(fpga):
     result = [x for group in zip(seg_a_unpacked, seg_b_unpacked, seg_c_unpacked, seg_d_unpacked) for x in group]
     
     return result
+
+fpga = casperfpga.CasperFpga('192.168.20.60')
+time.sleep(3)
+if (!fpga.is_connected()):
+    print("Did not connect to fpga")
+    die = 5 / 0
+
+while(1):
+    q = read_q_values(fpga)
+    i = read_i_values(fpga)
+
+    mag = np.hypot(np.array(i), np.array(q))
+
+    print(mag)
+    time.sleep(.2)
