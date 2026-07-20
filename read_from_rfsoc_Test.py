@@ -72,11 +72,19 @@ if (not fpga.is_connected()):
 
 accum = np.zeroes(1024)
 i = 0
-periods = 20
+periods = 0
 
 while(1):
+
+    vo = fpga.read_int("valid_read_out")
+
+    if vo != 1: continue
+
     q = read_q_values(fpga)
     i = read_i_values(fpga)
+
+    fpga.write("unlatch_read_out", 1)
+    fpga.write("unlatch_read_out", 0)
 
     mag = np.hypot(np.array(i), np.array(q))
 
