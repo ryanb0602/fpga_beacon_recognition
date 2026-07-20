@@ -1,6 +1,7 @@
 import casperfpga
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 def to_signed(val, bits):
     if val & (1 << (bits - 1)):
@@ -27,10 +28,10 @@ def unpack(bit_arr):
     return words
 
 def read_i_values(fpga):
-    segment_one = fpga.read("shared_bram", 1024, 0)
-    segment_two = fpga.read("shared_bram1", 1024, 0)
-    segment_three = fpga.read("shared_bram2", 1024, 0)
-    segment_four = fpga.read("shared_bram3", 1024, 0)
+    segment_one = fpga.read("Subsystem1_shared_bram", 1024, 0)
+    segment_two = fpga.read("Subsystem1_shared_bram1", 1024, 0)
+    segment_three = fpga.read("Subsystem1_shared_bram2", 1024, 0)
+    segment_four = fpga.read("Subsystem1_shared_bram3", 1024, 0)
 
     seg_a_unpacked = unpack(segment_one)
     seg_b_unpacked = unpack(segment_two)
@@ -42,10 +43,10 @@ def read_i_values(fpga):
     return result
 
 def read_q_values(fpga):
-    segment_one = fpga.read("shared_bram", 1024, 0)
-    segment_two = fpga.read("shared_bram1", 1024, 0)
-    segment_three = fpga.read("shared_bram2", 1024, 0)
-    segment_four = fpga.read("shared_bram3", 1024, 0)
+    segment_one = fpga.read("Subsystem2_shared_bram", 1024, 0)
+    segment_two = fpga.read("Subsystem2_shared_bram1", 1024, 0)
+    segment_three = fpga.read("Subsystem2_shared_bram2", 1024, 0)
+    segment_four = fpga.read("Subsystem2_shared_bram3", 1024, 0)
 
     seg_a_unpacked = unpack(segment_one)
     seg_b_unpacked = unpack(segment_two)
@@ -55,6 +56,13 @@ def read_q_values(fpga):
     result = [x for group in zip(seg_a_unpacked, seg_b_unpacked, seg_c_unpacked, seg_d_unpacked) for x in group]
     
     return result
+
+
+plt.ion()
+fig, ax = plt.subplots()
+line, = ax.plot([])
+ax.set_xlabel("index")
+ax.set_ylabel("magnitude")
 
 fpga = casperfpga.CasperFpga('192.168.20.60')
 time.sleep(3)
@@ -68,5 +76,12 @@ while(1):
 
     mag = np.hypot(np.array(i), np.array(q))
 
-    print(mag)
+    line.set_xdata(np.arange(len(mag)))
+    line.set_ydata(mag)
+    ax.relim()
+    ax.autoscale_view()
+
+    fig.canvas.draw()
+    fig.canvas.flush_events()
+
     time.sleep(.2)
