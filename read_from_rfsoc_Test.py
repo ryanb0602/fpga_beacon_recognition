@@ -66,9 +66,13 @@ ax.set_ylabel("magnitude")
 
 fpga = casperfpga.CasperFpga('192.168.20.60')
 time.sleep(3)
-if (!fpga.is_connected()):
+if (not fpga.is_connected()):
     print("Did not connect to fpga")
     die = 5 / 0
+
+accum = np.zeroes(1024)
+i = 0
+periods = 20
 
 while(1):
     q = read_q_values(fpga)
@@ -76,12 +80,19 @@ while(1):
 
     mag = np.hypot(np.array(i), np.array(q))
 
-    line.set_xdata(np.arange(len(mag)))
-    line.set_ydata(mag)
+    accum = accum + mag
+
+    if (i < periods) continue
+
+    line.set_xdata(np.arange(len(accum)))
+    line.set_ydata(accum)
     ax.relim()
     ax.autoscale_view()
 
     fig.canvas.draw()
     fig.canvas.flush_events()
 
-    time.sleep(.2)
+    i = 0
+    accum = np.zeroes(1024)
+
+    time.sleep(.001)
