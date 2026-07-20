@@ -39,7 +39,9 @@ def read_i_values(fpga):
     seg_d_unpacked = unpack(segment_four)
 
     result = [x for group in zip(seg_a_unpacked, seg_b_unpacked, seg_c_unpacked, seg_d_unpacked) for x in group]
-    
+   
+    result = [fbp17(x) for x in result]
+
     return result
 
 def read_q_values(fpga):
@@ -54,7 +56,10 @@ def read_q_values(fpga):
     seg_d_unpacked = unpack(segment_four)
 
     result = [x for group in zip(seg_a_unpacked, seg_b_unpacked, seg_c_unpacked, seg_d_unpacked) for x in group]
+
     
+    result = [fbp17(x) for x in result]
+
     return result
 
 
