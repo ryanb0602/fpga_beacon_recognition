@@ -4,7 +4,7 @@ add_files peak_find.cpp
 add_files -tb tb_peak_find.cpp
 open_solution "sol1"
 set_part {xczu48dr-ffvg1517-1-e}
-create_clock -period 3.7
+create_clock -period 3.7 ;#ns
 
 csim_design                  ;# Runs C simulation and generates CSV
 csynth_design                ;# Synthesizes C++ to RTL
